@@ -52,7 +52,7 @@ Slash command: `/camofox status|start|stop`.
 As an installable pi package (recommended):
 
 ```sh
-pi install npm:pifox        # or git:github.com/<you>/pifox
+pi install npm:pifox        # or git:github.com/Munstar0s/pifox
 ```
 
 Or auto-discovery: clone/symlink this repo into your global extensions
