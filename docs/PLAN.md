@@ -105,7 +105,7 @@ this repo and when installed under `~/.pi/agent/npm/<pkg>/`.
   `peerDependencies: "*"` per pi packaging rules (pi provides them; never
   bundled).
 - Install paths supported:
-  1. `pi install npm:<name>` / git URL (official route; deps auto-installed),
+  1. `pi install npm:@munstar0s/pifox` / git URL (official route; deps auto-installed),
   2. symlink/clone into `~/.pi/agent/extensions/PiFox` (auto-discovery),
      with `npm install` run once inside.
 

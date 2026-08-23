@@ -1,8 +1,12 @@
 # PiFox
 
+[![npm: @munstar0s/pifox](https://img.shields.io/npm/v/@munstar0s/pifox?label=npm%3A%20%40munstar0s%2Fpifox)](https://www.npmjs.com/package/@munstar0s/pifox)
+
 **Pi extension: the [Camofox](https://github.com/jo-inc/camofox-browser)
 anti-detection browser as native agent tools — with lazy lifecycle
 management.**
+
+npm package: **[`@munstar0s/pifox`](https://www.npmjs.com/package/@munstar0s/pifox)**
 
 PiFox registers 13 first-class tools (`camofox_create_tab`, `camofox_snapshot`,
 `camofox_click`, … plus `pifox_status` / `pifox_shutdown`) directly into the Pi
