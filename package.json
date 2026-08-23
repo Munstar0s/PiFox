@@ -48,5 +48,15 @@
   "bugs": {
     "url": "https://github.com/Munstar0s/PiFox/issues"
   },
-  "homepage": "https://github.com/Munstar0s/PiFox#readme"
+  "homepage": "https://github.com/Munstar0s/PiFox#readme",
+  "files": [
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
 }
