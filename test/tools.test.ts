@@ -75,35 +75,30 @@ describe("executeTool against the fake camofox", () => {
 		expect(textOf(clicked)).toContain('"userId": "pi"');
 	});
 
-	it("splits snapshot screenshots into an image block", async () => {
+	it("omits snapshot screenshots unless explicitly requested", async () => {
 		await executeTool("camofox_create_tab", { url: "https://example.com" }, ctx);
-		const listed = JSON.parse(
-			(await executeTool("camofox_list_tabs", {}, ctx)).content
-				.filter((b) => b.type === "text")
-				.map((b) => b.text ?? "")
-				.join(""),
-		);
-		const result = await executeTool("camofox_snapshot", { tabId: listed.tabs[0].tabId }, ctx);
-		expect(result.content).toHaveLength(2);
-		expect(result.content[0].type).toBe("text");
-		expect(result.content[1]).toMatchObject({ type: "image", mimeType: "image/png" });
-		expect(textOf(result)).not.toContain("screenshot");
+		const listed = JSON.parse(textOf(await executeTool("camofox_list_tabs", {}, ctx)));
+		const tabId = listed.tabs[0].tabId;
+		const textOnly = await executeTool("camofox_snapshot", { tabId }, ctx);
+		expect(textOnly.content.every((block) => block.type === "text")).toBe(true);
+		const withImage = await executeTool("camofox_snapshot", { tabId, includeScreenshot: true }, ctx);
+		expect(withImage.content.some((block) => block.type === "image")).toBe(true);
 	});
 
-	it("writes screenshots to savePath and returns image content", async () => {
+	it("saves screenshots to a file and only inlines when asked", async () => {
 		await executeTool("camofox_create_tab", { url: "https://example.com" }, ctx);
-		const listed = JSON.parse(
-			(await executeTool("camofox_list_tabs", {}, ctx)).content
-				.filter((b) => b.type === "text")
-				.map((b) => b.text ?? "")
-				.join(""),
-		);
+		const listed = JSON.parse(textOf(await executeTool("camofox_list_tabs", {}, ctx)));
+		const tabId = listed.tabs[0].tabId;
 		const savePath = join(tmpdir(), `pifox-shot-${Date.now()}.png`);
 		try {
-			const result = await executeTool("camofox_screenshot", { tabId: listed.tabs[0].tabId, savePath }, ctx);
-			expect(result.content.some((block) => block.type === "image")).toBe(true);
+			const result = await executeTool("camofox_screenshot", { tabId, savePath }, ctx);
+			expect(result.content.some((block) => block.type === "image")).toBe(false);
+			expect(textOf(result)).toContain(savePath);
 			const bytes = readFileSync(savePath);
 			expect(bytes.subarray(0, 4)).toEqual(Buffer.from("89504e47", "hex"));
+
+			const inline = await executeTool("camofox_screenshot", { tabId, inline: true }, ctx);
+			expect(inline.content.some((block) => block.type === "image")).toBe(true);
 		} finally {
 			rmSync(savePath, { force: true });
 		}

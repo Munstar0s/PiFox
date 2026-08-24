@@ -1,6 +1,6 @@
 {
   "name": "@munstar0s/pifox",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Pi extension: the Camofox anti-detection browser as native agent tools, with lazy lifecycle management",
   "type": "module",
   "license": "MIT",

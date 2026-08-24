@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, truncateHead } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -55,10 +56,13 @@ export const TOOL_DEFS = [
 	{
 		name: "camofox_snapshot",
 		description:
-			"Get accessibility snapshot of a Camoufox page with element refs (e1, e2, etc.) for interaction, plus a visual screenshot. Large pages are truncated with pagination links preserved at the bottom. If the response includes hasMore=true and nextOffset, call again with that offset to see more content.",
+			"Get accessibility snapshot of a Camoufox page with element refs (e1, e2, etc.) for interaction. Large pages are truncated with pagination links preserved at the bottom. If the response includes hasMore=true and nextOffset, call again with that offset to see more content. Set includeScreenshot=true only when you genuinely need the visual - it adds a large image to the conversation.",
 		parameters: Type.Object({
 			tabId: str("Tab identifier"),
 			offset: Type.Optional(Type.Number({ description: "Character offset for paginated snapshots" })),
+			includeScreenshot: Type.Optional(
+				Type.Boolean({ description: "Attach a full-page screenshot image (heavy on context; default false)" }),
+			),
 		}),
 	},
 	{
@@ -112,10 +116,11 @@ export const TOOL_DEFS = [
 	{
 		name: "camofox_screenshot",
 		description:
-			"Take a screenshot of a Camoufox page. Returns the image inline and optionally writes a PNG to savePath.",
+			"Take a screenshot of a Camoufox page. By default saves the PNG to a temp file (or savePath) and returns the path; set inline=true ONLY when you need to visually inspect the image yourself, because inline images consume significant conversation context.",
 		parameters: Type.Object({
 			tabId: str("Tab identifier"),
-			savePath: Type.Optional(str("Absolute file path to also save the PNG to")),
+			savePath: Type.Optional(str("Absolute file path to save the PNG to")),
+			inline: Type.Optional(Type.Boolean({ description: "Also embed the image in the conversation (default false)" })),
 		}),
 	},
 	{
@@ -188,7 +193,8 @@ export async function executeTool(
 				}),
 			);
 		case "camofox_snapshot": {
-			const params = new URLSearchParams({ userId, includeScreenshot: "true" });
+			const params = new URLSearchParams({ userId });
+			if (args.includeScreenshot === true) params.set("includeScreenshot", "true");
 			if (args.offset !== undefined && args.offset !== null && `${args.offset}` !== "") {
 				params.set("offset", String(args.offset));
 			}
@@ -198,7 +204,9 @@ export async function executeTool(
 			})) as { screenshot?: { data?: string; mimeType?: string } };
 			const { screenshot, ...rest } = payload ?? {};
 			const content: ContentBlock[] = [textBlock(JSON.stringify(rest, null, 2))];
-			if (screenshot?.data) {
+			// Attach the embedded image only when explicitly requested; servers
+			// should honor includeScreenshot, but never trust that for context size.
+			if (args.includeScreenshot === true && screenshot?.data) {
 				content.push({ type: "image", data: screenshot.data, mimeType: screenshot.mimeType || "image/png" });
 			}
 			return { content, details: {} };
@@ -234,19 +242,18 @@ export async function executeTool(
 		}
 		case "camofox_screenshot": {
 			const image = await ctx.client.image(`/tabs/${tabId}/screenshot?${new URLSearchParams({ userId })}`);
-			let savedNote = "";
-			if (typeof args.savePath === "string" && args.savePath.length > 0) {
-				await mkdir(dirname(args.savePath), { recursive: true });
-				await writeFile(args.savePath, Buffer.from(image.data, "base64"));
-				savedNote = ` Saved to ${args.savePath}.`;
-			}
-			return {
-				content: [
-					textBlock(`Screenshot captured (${image.mimeType}).${savedNote}`),
-					{ type: "image", data: image.data, mimeType: image.mimeType },
-				],
-				details: {},
-			};
+			const bytes = Buffer.from(image.data, "base64");
+			const target =
+				typeof args.savePath === "string" && args.savePath.length > 0
+					? args.savePath
+					: join(tmpdir(), `pifox-shot-${Date.now()}.png`);
+			await mkdir(dirname(target), { recursive: true });
+			await writeFile(target, bytes);
+			const sizeKb = Math.round(bytes.byteLength / 1024);
+			const summary = `Screenshot captured (${image.mimeType}, ${sizeKb} kB) saved to ${target}.`;
+			const content: ContentBlock[] = [textBlock(summary)];
+			if (args.inline === true) content.push({ type: "image", data: image.data, mimeType: image.mimeType });
+			return { content, details: {} };
 		}
 		case "camofox_close_tab":
 			return jsonResult(
